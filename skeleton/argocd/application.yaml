@@ -18,3 +18,4 @@ spec:
     managedNamespaceMetadata:
       labels:
         pfe-lab/guardrails: enabled
+        argocd.argoproj.io/managed-by: pfe-lab
