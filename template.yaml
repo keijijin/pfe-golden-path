@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=./backstage-template.schema.json
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: pfe-web-service
+  title: Web サービス（ゴールデンパス）
+  description: GitOps・リソース制限・所有者ラベルが設定済みの Web サービスを作成します
+  tags: [recommended, kubernetes, gitops]
+spec:
+  owner: guests
+  type: service
+
+  parameters:
+    - title: サービスの情報
+      required: [name, owner]
+      properties:
+        name:
+          title: サービス名
+          type: string
+          description: 英小文字・数字・ハイフンのみ
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          maxLength: 40
+          ui:autofocus: true
+        description:
+          title: 説明
+          type: string
+        owner:
+          title: オーナー
+          type: string
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+    - title: リポジトリ
+      required: [repoUrl]
+      properties:
+        repoUrl:
+          title: 作成先
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts: [github.com]
+
+  steps:
+    - id: fetch
+      name: 雛形を展開する
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          team: ${{ parameters.owner | parseEntityRef | pick('name') }}
+          destination: ${{ parameters.repoUrl | parseRepoUrl }}
+
+    - id: publish
+      name: GitHub にリポジトリを作成する
+      action: publish:github
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        description: ${{ parameters.description }}
+        defaultBranch: main
+        repoVisibility: public
+
+    - id: register
+      name: カタログに登録する
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: リポジトリを開く
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: カタログで開く
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
